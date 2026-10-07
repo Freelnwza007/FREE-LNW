@@ -2,10 +2,10 @@ const mongoose = require("mongoose");
 
 const orderItemSchema = new mongoose.Schema(
   {
-    product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+    product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", default: null },
     name: { type: String, required: true },
-    sku: { type: String, required: true },
-    size: { type: String, required: true },
+    sku: { type: String, default: "" },
+    size: { type: String, default: "" },
     grindOption: { type: String, default: "None" },
     price: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 1 },
@@ -16,7 +16,7 @@ const orderItemSchema = new mongoose.Schema(
 const orderSchema = new mongoose.Schema(
   {
     orderNumber: { type: String, required: true, unique: true },
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     items: { type: [orderItemSchema], required: true },
     shippingAddress: {
       name: { type: String, required: true },
@@ -34,6 +34,7 @@ const orderSchema = new mongoose.Schema(
       enum: ["pending", "paid", "failed", "refunded"],
       default: "pending",
     },
+    paymentMethod: { type: String, enum: ["promptpay"], default: "promptpay" },
     orderStatus: {
       type: String,
       enum: ["pending", "processing", "shipped", "delivered", "cancelled"],
