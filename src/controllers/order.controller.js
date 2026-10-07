@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Order = require("../models/order.model");
 const Product = require("../models/product.model");
+const staticCatalog = require("../../../client/catalog.json");
 
 const field = (id, value) => `${id}${String(value.length).padStart(2, "0")}${value}`;
 const crc16 = (value) => {
@@ -39,13 +40,20 @@ exports.createOrder = async (req, res, next) => {
       return res.status(400).json({ message: "ไม่พบสินค้าในคำสั่งซื้อ" });
     }
     const normalized = items.map((item) => ({ id: String(item.key || ""), quantity: Number(item.quantity) }));
-    if (normalized.some((item) => !mongoose.isValidObjectId(item.id) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99)) {
+    const staticNames = new Set(staticCatalog.map((product) => product.name));
+    if (normalized.some((item) => (!mongoose.isValidObjectId(item.id) && !staticNames.has(item.id)) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99)) {
       return res.status(400).json({ message: "รายการสินค้าไม่ถูกต้อง กรุณาลองใหม่" });
     }
-    const products = await Product.find({ _id: { $in: normalized.map((item) => item.id) }, isActive: true });
-    if (products.length !== normalized.length) return res.status(400).json({ message: "มีสินค้าบางรายการที่ไม่มีจำหน่ายแล้ว กรุณาตรวจสอบตะกร้า" });
+    const databaseIds = [...new Set(normalized.filter((item) => mongoose.isValidObjectId(item.id)).map((item) => item.id))];
+    const products = databaseIds.length ? await Product.find({ _id: { $in: databaseIds }, isActive: true }) : [];
+    if (products.length !== databaseIds.length) return res.status(400).json({ message: "มีสินค้าบางรายการที่ไม่มีจำหน่ายแล้ว กรุณาตรวจสอบตะกร้า" });
     const productMap = new Map(products.map((product) => [String(product._id), product]));
     const orderItems = normalized.map(({ id, quantity }) => {
+      const staticProduct = staticCatalog.find((product) => product.name === id);
+      if (staticProduct) {
+        const variant = staticProduct.variants[0];
+        return { product: null, name: staticProduct.name, sku: variant.sku, size: variant.size, price: variant.price, quantity };
+      }
       const product = productMap.get(id);
       const variant = product.variants[0];
       return { product: product._id, name: product.name, sku: variant.sku, size: variant.size, price: variant.price, quantity };
